@@ -1,0 +1,60 @@
+# ---- Dependencies ----
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# ---- Build outputs (regenerated locally) ----
+dist/
+client/dist/
+server/dist/
+extension/dist/
+# Compiled content script (source: extension/content_scripts/yt_studio.ts)
+extension/content_scripts/yt_studio.js
+*.tsbuildinfo
+
+# ---- Extension local state ----
+# extension/dist/ is the output of `npm run build:ext` (client -> extension/dist)
+# extension/content_scripts/yt_studio.js is compiled from yt_studio.ts via `npm run build:content`
+
+# ---- Server runtime (download manually, never commit) ----
+# Get via: npm run fetch:binaries  (ffmpeg + yt-dlp into server/)
+server/*.exe
+server/*.zip
+server/ffmpeg_dir/
+server/ffmpeg_tmp/
+server/clips/
+server/clips.json
+server/config.json
+# Runtime-downloaded ML models (auto-fetched on first run if missing)
+server/models/ferplus*.onnx
+clip.mp4
+
+# ---- Python ----
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# ---- Secrets / local config ----
+.env
+.env.*
+!.env.example
+cookies.txt
+
+# ---- Logs ----
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ---- IDE / Editor ----
+.vscode/
+.idea/
+*.swp
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+desktop.ini

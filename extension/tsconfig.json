@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM"],
+    "module": "es2020",
+    "strict": true,
+    "skipLibCheck": true,
+    "rootDir": "./content_scripts",
+    "declaration": false,
+    "sourceMap": false
+  },
+  "include": ["content_scripts/yt_studio.ts"]
+}

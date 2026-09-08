@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "YT Short Clip Side Panel",
+  "version": "1.0.0",
+  "description": "Side-panel extension untuk potong, transkripsi & auto-upload video YouTube Shorts menggunakan sesi login browser.",
+  "permissions": [
+    "activeTab",
+    "sidePanel",
+    "tabs",
+    "storage",
+    "scripting",
+    "downloads"
+  ],
+  "host_permissions": [
+    "http://localhost:3002/*",
+    "https://studio.youtube.com/*",
+    "https://*.youtube.com/*"
+  ],
+  "side_panel": {
+    "default_path": "dist/index.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://studio.youtube.com/*"],
+      "js": ["content_scripts/yt_studio.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "externally_connectable": {
+    "matches": ["http://localhost:5173/*", "http://localhost:3002/*"]
+  }
+}

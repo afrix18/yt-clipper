@@ -1,0 +1,17 @@
+{
+  "name": "yt-short-clipper-extension",
+  "private": true,
+  "description": "Chrome extension (side panel) + local server to turn long-form YouTube videos into 9:16 Shorts clips with AI highlight detection and auto-upload.",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "install:all": "npm --prefix server install && npm --prefix client install",
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "build:content": "node server/node_modules/typescript/bin/tsc -p extension/tsconfig.json",
+    "build:ext": "npm run build:content && npm --prefix client run build:ext",
+    "typecheck": "npm --prefix server run typecheck && node client/node_modules/typescript/bin/tsc -b client --pretty false",
+    "start": "npm --prefix server start",
+    "fetch:binaries": "powershell -ExecutionPolicy Bypass -File server/scripts/fetch-binaries.ps1"
+  }
+}

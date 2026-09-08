@@ -1,0 +1,8 @@
+# Python deps for clipper SERVER only (face/reframe helpers).
+# Install with: py -m pip install -r server/requirements.txt
+# Both scripts degrade gracefully if a package is missing
+# (detect_face.py falls back to center-crop, analyze_reaction.py falls back to audio+text).
+
+opencv-python>=4.8.0
+numpy>=1.24.0
+mediapipe>=0.10.0
