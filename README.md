@@ -19,9 +19,38 @@ tanpa OAuth).
 
 | Komponen | Lokasi | Peran |
 |---|---|---|
-| Dashboard side panel | `client/` → build ke `extension/dist/` | UI: tempel URL, auto-detect momen viral, atur framing/caption, antre upload |
-| Extension Chrome MV3 | `extension/` (`manifest.json`, `content_scripts/yt_studio.js`) | Side panel + otomasi halaman upload YouTube Studio |
-| Backend lokal | `server/` (`index.js`, `aiService.js`) | Transkripsi Whisper, deteksi momen viral (Groq/OpenAI), render klip 9:16, antrean upload |
+| Dashboard side panel | `client/src/` → build ke `extension/dist/` | UI: tempel URL, auto-detect momen viral, atur framing/caption, antre upload |
+| Extension Chrome MV3 | `extension/` (`manifest.json`, `content_scripts/yt_studio.ts`) | Side panel + otomasi halaman upload YouTube Studio |
+| Backend lokal | `server/` (lihat peta modul di bawah) | Transkripsi Whisper, deteksi momen viral (Groq/OpenAI), render klip 9:16/16:9, antrean upload |
+
+## Peta modul kode
+
+```
+server/
+  index.ts            → wiring Express saja (mount router + listen)
+  lib/
+    types.ts          → ClipMeta, UploadItem, ServerConfig, CmdResult
+    paths.ts          → SERVER_DIR + path runtime (aman untuk dist/ maupun tsx)
+    store.ts          → clips.json / config.json + resolve API key
+    proc.ts           → runCmd, spawnProcess, generateId, formatDuration
+    sse.ts            → helper Server-Sent Events + keepalive
+    video.ts          → filter-graph FFmpeg per framing (satu cabang per mode)
+  routes/             → settings, autoDetect, clip, clips, upload, captions
+  ai/
+    whisper.ts        → Whisper API + chunking audio
+    signals.ts        → energy audio, lexicon emosi/war, fuse peaks, game-break
+    llm.ts            → chat fallback multi-model + discovery model Groq
+    moments.ts        → two-pass detect viral + sanitize/rank
+    subtitles.ts      → subtitle ASS gaya TikTok
+    caption.ts        → caption sosial AI
+client/src/
+  types.ts            → tipe bersama (ClipMeta, ViralMoment, GameBreak, ...)
+  lib/                → api.ts (fetch + SSE helper), format.ts (waktu/tanggal)
+  hooks/              → useSettings, useClips, useCreate, useUpload
+  components/         → CreatePanel, MomentsList, GameBreaksList,
+                        HistoryPanel, UploadPanel, SettingsModal
+  App.tsx             → composition shell (tab + wiring hook)
+```
 
 ## Fitur
 

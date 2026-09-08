@@ -15,6 +15,6 @@
     "declaration": false,
     "sourceMap": false
   },
-  "include": ["index.ts", "aiService.ts"],
+  "include": ["index.ts", "lib/**/*.ts", "routes/**/*.ts", "ai/**/*.ts"],
   "exclude": ["node_modules", "dist", "clips", "scripts"]
 }
