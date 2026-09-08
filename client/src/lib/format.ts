@@ -35,3 +35,10 @@ export const formatScheduleDisplay = (isoStr: string): string => {
     return isoStr;
   }
 };
+
+/** Format Date ke "YYYY-MM-DDTHH:mm" WAKTU LOKAL (untuk input datetime-local).
+ * Jangan pakai toISOString (UTC) — menggeser jam sesuai zona waktu. */
+export const toLocalInputValue = (d: Date): string => {
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};

@@ -210,6 +210,8 @@ export async function detectViralMoments(transcriptData: TranscriptData, apiKey:
     durationRule = 'Berdurasi STANDAR antara 30 detik sampai 60 detik (durasi optimal YouTube Shorts & TikTok). Sesuaikan dengan alur cerita yang tuntas.';
   } else if (durationOption === 'long') {
     durationRule = 'Berdurasi PANJANG antara 60 detik sampai 120 detik (cocok untuk cerita mendalam, tutorial, atau podcast klip).';
+  } else if (durationOption === 'warfull') {
+    durationRule = 'Berdurasi WAR FULL antara 60 detik sampai 300 detik: mencakup setup, teamfight utuh, dan hasilnya (jangan dipotong jadi hook kilat 15-30 detik).';
   } else if (durationOption === 'custom' && minDuration && maxDuration) {
     durationRule = `Berdurasi antara ${minDuration} detik sampai ${maxDuration} detik sesuai preferensi pengguna.`;
   }

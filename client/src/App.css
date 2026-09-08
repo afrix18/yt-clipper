@@ -60,6 +60,21 @@
   box-shadow: 0 0 24px rgba(139, 92, 246, 0.3);
 }
 
+.app-logo-text {
+  width: 38px;
+  height: 38px;
+  background: var(--gradient-primary);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 800;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 0 24px rgba(139, 92, 246, 0.3);
+}
+
 .app-header-text {
   flex: 1;
 }
@@ -144,7 +159,142 @@
   font-size: 13px;
 }
 
-/* ===== Tab Navigation ===== */
+/* ===== Steps Navigation (wizard, tanpa ikon) ===== */
+.steps-nav {
+  display: flex;
+  gap: 4px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  padding: 4px;
+  border: 1px solid var(--border);
+}
+
+.step-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 6px;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--transition);
+  white-space: nowrap;
+}
+
+.step-item:hover {
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.step-item.active {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.step-item.active .step-num {
+  background: var(--accent);
+  color: #fff;
+}
+
+.step-item.done .step-num {
+  background: rgba(34, 197, 94, 0.25);
+  color: #4ade80;
+}
+
+.step-label { line-height: 1.2; }
+
+/* ===== Jobs Banner (tugas server yang tetap jalan) ===== */
+.jobs-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px;
+}
+
+.jobs-banner-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  align-items: center;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.jobs-banner-label {
+  font-size: 12px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jobs-banner-pct {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-light, #a78bfa);
+}
+
+.jobs-banner-stage {
+  font-size: 11px;
+  color: var(--text-muted);
+  grid-column: 1 / -1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jobs-banner-bar {
+  grid-column: 1 / -1;
+  height: 4px;
+  border-radius: 100px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.jobs-banner-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 100px;
+  transition: width 0.5s ease;
+}
+
+.jobs-banner-more {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ===== Tab Navigation (lama, tidak dipakai wizard) ===== */
 .tab-nav {
   display: flex;
   gap: 4px;

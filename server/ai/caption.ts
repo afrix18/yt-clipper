@@ -11,8 +11,17 @@ export interface SocialCaption {
 export async function generateSocialCaption(clipTitle: string, transcriptText: string, platform = 'youtube', apiKey?: string, provider = 'groq', channelName = ''): Promise<SocialCaption> {
   if (!apiKey) throw new Error('API Key belum diisi. Buka menu Settings ⚙️.');
 
-  const platformName = platform === 'tiktok' ? 'TikTok' : platform === 'instagram' ? 'Instagram Reels' : 'YouTube Shorts';
-  const tagRule = platform === 'youtube' ? 'Wajib sertakan #Shorts di akhir judul dan di daftar hashtag.' : 'Gunakan hashtag viral TikTok/Reels.';
+  const isTournament = platform === 'tournament' || platform === 'mlbb';
+  const isPodcast = platform === 'podcast';
+  const platformName = isTournament ? 'YouTube (Video Turnamen MLBB Reguler)'
+    : isPodcast ? 'YouTube Shorts (Podcast Clip)'
+    : platform === 'tiktok' ? 'TikTok'
+    : platform === 'instagram' ? 'Instagram Reels' : 'YouTube Shorts';
+  const tagRule = isTournament
+    ? 'JANGAN sertakan #Shorts (ini video reguler 4:3, bukan Shorts). Wajib sertakan #MLBB di judul atau hashtag.'
+    : isPodcast
+      ? 'Wajib sertakan #Shorts di akhir judul dan #Podcast di daftar hashtag.'
+      : platform === 'youtube' ? 'Wajib sertakan #Shorts di akhir judul dan di daftar hashtag.' : 'Gunakan hashtag viral TikTok/Reels.';
 
   let channelTag = '';
   if (channelName) {
@@ -46,8 +55,8 @@ ATURAN PEMBUATAN:
 3. "hashtags":
    - Array string hashtag (diawali tanda #).
    - WAJIB masukkan hashtag nama channel kreator: ${channelTag ? `"${channelTag}"` : 'nama channel kreator'}.
-   - Masukkan 2-3 hashtag topik/genre spesifik dari isi video (contoh: #Gaming, #Horor, #Lucu, #Reaction, #MomenLucu, dsb).
-   - Masukkan hashtag trending platform: ${platform === 'youtube' ? '["#Shorts", "#YouTubeShorts", "#Viral", "#FYP", "#Trending"]' : '["#Viral", "#FYP", "#Trending"]'}.
+    - Masukkan 2-3 hashtag topik/genre spesifik dari isi video (contoh: ${isTournament ? '#MLBB, #MobileLegends, #Turnamen, #Esports, #War' : isPodcast ? '#Podcast, #PodcastClip, #Cerita, #Motivasi' : '#Gaming, #Horor, #Lucu, #Reaction, #MomenLucu, dsb'}).
+    - Masukkan hashtag trending platform: ${isTournament ? '["#MLBB", "#MobileLegends", "#Turnamen", "#Viral"]' : platform === 'youtube' || isPodcast ? '["#Shorts", "#YouTubeShorts", "#Viral", "#FYP", "#Trending"]' : '["#Viral", "#FYP", "#Trending"]'}.
    - Total 6 sampai 9 hashtag.
 
 4. Bahasa: Gunakan Bahasa Indonesia yang luwes, santai, dan sangat memikat penonton media sosial.
@@ -92,7 +101,8 @@ Output HANYA format JSON valid tanpa markdown backtick:
   const cleaned = rawContent.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
   try {
     const parsed: any = JSON.parse(cleaned);
-    const tags = Array.isArray(parsed.hashtags) ? parsed.hashtags : ['#Shorts', '#FYP', '#Viral'];
+    const fallbackTags = isTournament ? ['#MLBB', '#MobileLegends', '#Turnamen', '#Viral'] : ['#Shorts', '#FYP', '#Viral'];
+    const tags = Array.isArray(parsed.hashtags) ? parsed.hashtags : fallbackTags;
     const formattedTags = tags.map((t: any) => (typeof t === 'string' && t.startsWith('#')) ? t : `#${t}`);
     return {
       title: parsed.title || clipTitle,
@@ -101,11 +111,13 @@ Output HANYA format JSON valid tanpa markdown backtick:
       fullCaption: `${parsed.description || ''}\n\n${formattedTags.join(' ')}`.trim(),
     };
   } catch {
+    const fallbackTitle = isTournament ? `${clipTitle} | MLBB War Full` : `${clipTitle} #Shorts`;
+    const fallbackTags = isTournament ? ['#MLBB', '#MobileLegends', '#Turnamen', '#Viral'] : ['#Shorts', '#Viral', '#FYP', '#Trending'];
     return {
-      title: `${clipTitle} #Shorts`,
+      title: fallbackTitle,
       description: `Tonton momen seru ini! Jangan lupa like dan subscribe untuk video seru lainnya!`,
-      hashtags: ['#Shorts', '#Viral', '#FYP', '#Trending'],
-      fullCaption: `Tonton momen seru ini! Jangan lupa like dan subscribe!\n\n#Shorts #Viral #FYP #Trending`,
+      hashtags: fallbackTags,
+      fullCaption: `Tonton momen seru ini! Jangan lupa like dan subscribe!\n\n${fallbackTags.join(' ')}`,
     };
   }
 }

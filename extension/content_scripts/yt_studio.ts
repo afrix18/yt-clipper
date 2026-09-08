@@ -141,8 +141,81 @@ declare const chrome: any;
     return null;
   }
 
-  function formatScheduleDisplay(isoStr: string | null | undefined): string {
-    if (!isoStr) return '';
+  // ── Isi jam tayang Studio dari string lokal "YYYY-MM-DDTHH:mm" ──
+  // Mengembalikan true bila nilai terverifikasi terbaca kembali di input.
+  // Tidak memakai `new Date()` agar tidak ada konversi zona waktu.
+  async function setStudioScheduleTime(localStr: string): Promise<boolean> {
+    const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(String(localStr || ''));
+    if (!m) {
+      console.warn('[YT Clipper] Invalid scheduleTime format:', localStr);
+      return false;
+    }
+    const hh = parseInt(m[4], 10);
+    const mm = m[5];
+    const candidates = [
+      `${hh.toString().padStart(2, '0')}:${mm}`,              // 24 jam: "18:00"
+      `${hh % 12 || 12}:${mm} ${hh >= 12 ? 'PM' : 'AM'}`,     // 12 jam: "6:00 PM"
+    ];
+
+    const findTimeInput = (): HTMLInputElement | null => {
+      const sels = [
+        'ytcp-time-of-day-picker input',
+        '#time-of-day-trigger input',
+        'ytcp-scheduling-picker input',
+        'input[aria-label*="time" i]',
+        'input[aria-label*="waktu" i]',
+        'input[aria-label*="jam" i]',
+        'input[placeholder*=":"]',
+      ];
+      for (const s of sels) {
+        try {
+          const el = document.querySelector(s) as HTMLInputElement | null;
+          if (el && el.offsetParent !== null) return el;
+        } catch { /* selector tidak valid di browser ini */ }
+      }
+      return null;
+    };
+
+    // Dialog jadwal Studio kadang butuh dibuka/difokuskan dulu.
+    const trigger = document.querySelector('#datepicker-trigger, #date-picker-trigger, ytcp-datepicker-trigger') as HTMLElement | null;
+    if (trigger) {
+      try { safeClick(trigger); await sleep(600); } catch { /* abaikan */ }
+    }
+
+    const input = await waitForElement(() => findTimeInput(), 8000);
+    if (!input) {
+      console.warn('[YT Clipper] Time input not found. Tried selectors for ytcp-time-of-day-picker.');
+      return false;
+    }
+    console.log('[YT Clipper] Time input found:', input.outerHTML.slice(0, 160));
+
+    for (const text of candidates) {
+      try {
+        (input as HTMLElement).focus();
+        (input as HTMLInputElement).click?.();
+        await sleep(200);
+        // Hapus total lalu ketik ulang (lebih andal untuk input Polymer).
+        document.execCommand('selectAll', false);
+        document.execCommand('insertText', false, text);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+        input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', code: 'Enter' }));
+        await sleep(500);
+        input.dispatchEvent(new Event('blur', { bubbles: true }));
+        await sleep(300);
+        const back = ((input as HTMLInputElement).value || '').trim();
+        console.log(`[YT Clipper] Tried "${text}", input now reads "${back}"`);
+        if (back.includes(`${hh.toString().padStart(2, '0')}:${mm}`) || back.includes(`${hh % 12 || 12}:${mm}`)) {
+          return true;
+        }
+      } catch (tErr) {
+        console.warn('[YT Clipper] Time fill attempt failed:', tErr);
+      }
+    }
+    return false;
+  }
+
+  function formatScheduleDisplay(isoStr: string | null | undefined): string {    if (!isoStr) return '';
     try {
       const d = new Date(isoStr);
       return d.toLocaleDateString('id-ID', {
@@ -642,31 +715,12 @@ declare const chrome: any;
         await sleep(800);
       }
 
-      // Try setting time in YouTube Studio time picker
-      try {
-        const d = new Date(data.scheduleTime);
-        if (!isNaN(d.getTime())) {
-          const h = d.getHours();
-          const m = d.getMinutes().toString().padStart(2, '0');
-          const time24 = `${h.toString().padStart(2, '0')}:${m}`;
-          const ampm = h >= 12 ? 'PM' : 'AM';
-          const h12 = h % 12 || 12;
-          const time12 = `${h12}:${m} ${ampm}`;
-
-          const timeInput = (document.querySelector('ytcp-time-of-day-picker input') ||
-                             document.querySelector('#time-of-day-trigger input') ||
-                             document.querySelector('input[aria-label*="time" i]') ||
-                             document.querySelector('input[aria-label*="waktu" i]')) as HTMLInputElement | null;
-
-          if (timeInput) {
-            setElementText(timeInput, time24);
-            await sleep(300);
-            setElementText(timeInput, time12);
-            await sleep(300);
-          }
-        }
-      } catch (tErr) {
-        console.warn('[YT Clipper] Time picker setup warning:', tErr);
+      // Isi jam tayang (format lokal "YYYY-MM-DDTHH:mm", TANPA konversi zona).
+      // Tanggal tidak disentuh — biarkan sesuai pilihan/ITS default Studio.
+      const timeOk = await setStudioScheduleTime(data.scheduleTime);
+      if (!timeOk) {
+        updateBadgeStatus('Peringatan: jam gagal diisi otomatis — periksa/isi jam manual di dialog jadwal.', true);
+        console.warn('[YT Clipper] Time picker fill failed for:', data.scheduleTime);
       }
 
     } else {

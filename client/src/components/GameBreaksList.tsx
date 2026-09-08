@@ -11,11 +11,12 @@ interface GameBreaksListProps {
 
 export function GameBreaksList({ breaks, framing, videoEndSec, loading, onClipGame }: GameBreaksListProps) {
   if (breaks.length === 0) return null;
+  const formatName = framing === 'landscape' ? '16:9' : framing === 'mlbb' ? '4:3' : '9:16';
 
   return (
     <div className="game-breaks-section animate-in" style={{ marginBottom: '14px' }}>
-      <h4>🏟️ {breaks.length} Batas Game Terdeteksi</h4>
-      <p className="viral-video-title">Potong per game (format mengikuti framing aktif: {framing === 'landscape' ? '16:9' : '9:16'})</p>
+      <h4>{breaks.length} Batas Game Terdeteksi</h4>
+      <p className="viral-video-title">Potong per game (format aktif: {formatName})</p>
       <div className="moments-list">
         {breaks.map((g, idx) => {
           const nextBreak = breaks[idx + 1];
@@ -26,7 +27,7 @@ export function GameBreaksList({ breaks, framing, videoEndSec, loading, onClipGa
                 <span className="moment-index">G{idx + 1}</span>
                 <h4 className="moment-title">{g.label}</h4>
                 <span className="moment-duration-pill">
-                  ⏱️ {formatSec(g.time)} → {formatSec(segEnd)}
+                  {formatSec(g.time)} - {formatSec(segEnd)}
                 </span>
               </div>
               <button
@@ -35,7 +36,7 @@ export function GameBreaksList({ breaks, framing, videoEndSec, loading, onClipGa
                 onClick={() => onClipGame(idx)}
                 disabled={loading}
               >
-                ✂️ Potong Game {idx + 1}
+                Potong Game {idx + 1}
               </button>
             </div>
           );

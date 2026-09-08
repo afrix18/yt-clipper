@@ -27,5 +27,7 @@ export const CONFIG_FILE = path.join(SERVER_DIR, 'config.json');
 export const YTDLP_PATH = path.join(SERVER_DIR, 'yt-dlp.exe');
 export const FFMPEG_PATH = path.join(SERVER_DIR, 'ffmpeg.exe');
 export const DETECT_FACE_SCRIPT = path.join(SERVER_DIR, 'detect_face.py');
+export const CACHE_DIR = path.join(SERVER_DIR, 'cache');
 
 if (!fs.existsSync(CLIPS_DIR)) fs.mkdirSync(CLIPS_DIR, { recursive: true });
+if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });

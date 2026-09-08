@@ -10,6 +10,7 @@ server/dist/
 extension/dist/
 # Compiled content script (source: extension/content_scripts/yt_studio.ts)
 extension/content_scripts/yt_studio.js
+extension/content_scripts/tiktok_studio.js
 *.tsbuildinfo
 
 # ---- Extension local state ----
@@ -25,6 +26,8 @@ server/ffmpeg_tmp/
 server/clips/
 server/clips.json
 server/config.json
+server/jobs.json
+server/cache/
 # Runtime-downloaded ML models (auto-fetched on first run if missing)
 server/models/ferplus*.onnx
 clip.mp4

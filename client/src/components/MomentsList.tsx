@@ -12,30 +12,52 @@ interface MomentsListProps {
   onClipOne: (m: ViralMoment) => void;
   onBatchGenerate: () => void;
   onShowMore: () => void;
+  onReset?: () => void;
 }
 
 export function MomentsList({
   moments, visibleCount, videoTitle, loading,
   onToggleSelect, onUpdateDuration, onUpdateTime,
-  onClipOne, onBatchGenerate, onShowMore,
+  onClipOne, onBatchGenerate, onShowMore, onReset,
 }: MomentsListProps) {
   if (moments.length === 0) return null;
+  const selectedCount = moments.filter(m => m.selected).length;
 
   return (
     <div className="viral-moments-section animate-in">
       <div className="viral-section-header">
         <div>
-          <h4>🔥 {moments.length} Momen Viral Terdeteksi</h4>
-          <p className="viral-video-title">{videoTitle}</p>
+          <h4>{moments.length} Momen Ditemukan ({selectedCount} dipilih)</h4>
+          {videoTitle && <p className="viral-video-title">{videoTitle}</p>}
         </div>
-        <button
-          type="button"
-          className="submit-btn batch-all-btn"
-          onClick={onBatchGenerate}
-          disabled={loading}
-        >
-          🚀 Generate Semua
-        </button>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {onReset && (
+            <button
+              type="button"
+              className="submit-btn"
+              onClick={onReset}
+              disabled={loading}
+              title="Bersihkan daftar momen dan masukkan video baru"
+              style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(255, 255, 255, 0.15)',
+                color: 'var(--text-main, #e2e8f0)',
+                padding: '0 12px',
+                fontSize: '13px',
+              }}
+            >
+              Ganti Video
+            </button>
+          )}
+          <button
+            type="button"
+            className="submit-btn batch-all-btn"
+            onClick={onBatchGenerate}
+            disabled={loading}
+          >
+            Render Semua
+          </button>
+        </div>
       </div>
 
       <div className="moments-list">
@@ -50,13 +72,13 @@ export function MomentsList({
               />
               <span className="moment-index">#{idx + 1}</span>
               <h4 className="moment-title">{m.title}</h4>
-              <span className="moment-score">{m.viralityScore}/100 🔥</span>
+              <span className="moment-score">{m.viralityScore}/100</span>
             </div>
 
             <div className="moment-trim-section">
               <div className="moment-duration-row">
                 <span className="moment-duration-pill">
-                  ⏱️ Durasi: <strong>{m.duration}s</strong> ({formatSec(m.startSec)} - {formatSec(m.endSec)})
+                  Durasi: <strong>{m.duration}s</strong> ({formatSec(m.startSec)} - {formatSec(m.endSec)})
                 </span>
                 <div className="moment-quick-nudge">
                   <span className="nudge-title">Panjang Klip:</span>
@@ -93,13 +115,13 @@ export function MomentsList({
 
             {m.hook && (
               <p className="moment-hook">
-                <strong>🎣 Hook:</strong> "{m.hook}"
+                <strong>Hook:</strong> {m.hook}
               </p>
             )}
 
             {m.reason && (
               <p className="moment-reason">
-                💡 {m.reason}
+                {m.reason}
               </p>
             )}
 
@@ -109,7 +131,7 @@ export function MomentsList({
               onClick={() => onClipOne(m)}
               disabled={loading}
             >
-              ✂️ Clip Momen Ini
+              Render Momen Ini
             </button>
           </div>
         ))}

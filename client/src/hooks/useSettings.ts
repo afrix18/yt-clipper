@@ -56,7 +56,7 @@ export function useSettings() {
       setHasOpenaiKey(true);
     }
 
-    setSettingsMsg('✅ Pengaturan berhasil disimpan!');
+    setSettingsMsg('Pengaturan berhasil disimpan.');
 
     // Sync to backend
     try {

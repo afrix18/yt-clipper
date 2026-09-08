@@ -9,5 +9,5 @@
     "declaration": false,
     "sourceMap": false
   },
-  "include": ["content_scripts/yt_studio.ts"]
+  "include": ["content_scripts/yt_studio.ts", "content_scripts/tiktok_studio.ts"]
 }

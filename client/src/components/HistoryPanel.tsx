@@ -6,20 +6,22 @@ import type { ClipMeta } from '../types';
 interface HistoryPanelProps {
   clips: ClipsApi;
   onUploadClip: (clip: ClipMeta) => void;
-  onGoCreate: () => void;
+  onGoVideo: () => void;
 }
 
 function framingLabel(framing?: string): string {
   switch (framing) {
-    case 'streamer': return '🎮 Streamer';
-    case 'smart': return '🤖 Smart Crop';
-    case 'landscape': return '📐 Landscape';
-    case 'blur': return '🌫️ Blur';
-    default: return '✂️ Crop Tengah';
+    case 'streamer': return 'Streamer 9:16';
+    case 'mlbb': return 'MLBB 4:3';
+    case 'mlbb-vertical': return 'MLBB Vertikal';
+    case 'smart': return 'Smart Crop';
+    case 'landscape': return 'Landscape 16:9';
+    case 'blur': return 'Blur BG';
+    default: return 'Crop Tengah';
   }
 }
 
-export function HistoryPanel({ clips, onUploadClip, onGoCreate }: HistoryPanelProps) {
+export function HistoryPanel({ clips, onUploadClip, onGoVideo }: HistoryPanelProps) {
   const {
     clips: clipList, loadingClips,
     previewClipId, setPreviewClipId,
@@ -36,14 +38,13 @@ export function HistoryPanel({ clips, onUploadClip, onGoCreate }: HistoryPanelPr
 
   return (
     <div className="history-panel animate-in">
-      {loadingClips && <div className="loading-placeholder"><span className="spinner" /> Memuat daftar clip...</div>}
+      {loadingClips && <div className="loading-placeholder"><span className="spinner" /> Memuat daftar klip...</div>}
 
       {!loadingClips && clipList.length === 0 && (
         <div className="empty-state">
-          <div className="empty-icon-wrap"><span className="empty-icon">📭</span></div>
-          <h3>Belum ada clip</h3>
-          <p>Buat clip pertama untuk memulai</p>
-          <button className="ghost-btn" onClick={onGoCreate}>✂️ Buat Clip Pertama</button>
+          <h3>Belum ada klip</h3>
+          <p>Buat klip pertama untuk memulai.</p>
+          <button className="ghost-btn" onClick={onGoVideo}>Buat Klip Pertama</button>
         </div>
       )}
 
@@ -55,12 +56,12 @@ export function HistoryPanel({ clips, onUploadClip, onGoCreate }: HistoryPanelPr
               {clip.virality && <ViralityBadge virality={clip.virality} />}
             </div>
             <div className="clip-tags-row">
-              <span className="clip-tag">⏱️ {clip.durationFormatted}</span>
-              <span className="clip-tag">📦 {clip.fileSizeMB} MB</span>
+              <span className="clip-tag">{clip.durationFormatted}</span>
+              <span className="clip-tag">{clip.fileSizeMB} MB</span>
               <span className="clip-tag">{framingLabel(clip.framing)}</span>
               <span className="clip-tag">{clip.quality || '1080p'}</span>
-              {clip.hasCaptions && <span className="clip-tag caption-tag">🔤 Subtitle</span>}
-              <span className="clip-tag">📅 {formatDate(clip.createdAt)}</span>
+              {clip.hasCaptions && <span className="clip-tag caption-tag">Subtitle</span>}
+              <span className="clip-tag">{formatDate(clip.createdAt)}</span>
             </div>
           </div>
 
@@ -75,13 +76,13 @@ export function HistoryPanel({ clips, onUploadClip, onGoCreate }: HistoryPanelPr
                 className="clip-video-element"
               />
               <button className="ghost-btn ghost-btn-sm close-preview-btn" onClick={() => setPreviewClipId(null)}>
-                ✕ Tutup Player
+                Tutup Player
               </button>
             </div>
           ) : (
             <div className="preview-trigger-box" onClick={() => setPreviewClipId(clip.id)}>
               <span className="play-icon-badge">▶</span>
-              <span>Tonton Preview Video</span>
+              <span>Putar Pratinjau</span>
             </div>
           )}
 
@@ -96,7 +97,7 @@ export function HistoryPanel({ clips, onUploadClip, onGoCreate }: HistoryPanelPr
                 <span className="virality-score">{clip.virality.total}</span>
               </div>
               {clip.virality.tips.map((tip, i) => (
-                <p key={i} className="virality-tip">💡 {tip}</p>
+                <p key={i} className="virality-tip">{tip}</p>
               ))}
             </div>
           )}
@@ -109,7 +110,7 @@ export function HistoryPanel({ clips, onUploadClip, onGoCreate }: HistoryPanelPr
               ) : (
                 <>
                   <p className="transcript-text">{transcript}</p>
-                  <button className="ghost-btn ghost-btn-sm" onClick={() => navigator.clipboard.writeText(transcript)}>📋 Salin Teks</button>
+                  <button className="ghost-btn ghost-btn-sm" onClick={() => navigator.clipboard.writeText(transcript)}>Salin Teks</button>
                 </>
               )}
             </div>
@@ -117,17 +118,17 @@ export function HistoryPanel({ clips, onUploadClip, onGoCreate }: HistoryPanelPr
 
           {/* Actions */}
           <div className="clip-actions">
-            <button className="action-btn" onClick={() => downloadClip(clip)} title="Download"><span>⬇️</span><span className="action-label">Download</span></button>
-            <button className="action-btn" onClick={() => analyzeVirality(clip)} disabled={loadingVirality === clip.id} title="Viralitas">
-              {loadingVirality === clip.id ? <span className="spinner-sm" /> : <span>📊</span>}
-              <span className="action-label">Viral</span>
+            <button className="action-btn" onClick={() => downloadClip(clip)} title="Unduh file"><span className="action-label">Unduh</span></button>
+            <button className="action-btn" onClick={() => analyzeVirality(clip)} disabled={loadingVirality === clip.id} title="Skor viralitas">
+              {loadingVirality === clip.id ? <span className="spinner-sm" /> : null}
+              <span className="action-label">Skor</span>
             </button>
             <button className="action-btn" onClick={() => { if (transcriptClipId === clip.id) setTranscriptClipId(null); else transcribeClip(clip); }} title="Transkripsi">
-              {loadingTranscript && transcriptClipId === clip.id ? <span className="spinner-sm" /> : <span>📝</span>}
-              <span className="action-label">Teks</span>
+              {loadingTranscript && transcriptClipId === clip.id ? <span className="spinner-sm" /> : null}
+              <span className="action-label">Transkrip</span>
             </button>
-            <button className="action-btn" onClick={() => onUploadClip(clip)} title="Upload"><span>🚀</span><span className="action-label">Upload</span></button>
-            <button className="action-btn action-btn-danger" onClick={() => deleteClip(clip.id)} title="Hapus"><span>🗑️</span></button>
+            <button className="action-btn" onClick={() => onUploadClip(clip)} title="Lanjut ke publikasi"><span className="action-label">Publikasikan</span></button>
+            <button className="action-btn action-btn-danger" onClick={() => deleteClip(clip.id)} title="Hapus"><span className="action-label">Hapus</span></button>
           </div>
         </div>
       ))}

@@ -7,7 +7,7 @@ export type ClipMeta = {
   endSec: number;
   duration: number;
   durationFormatted: string;
-  framing?: 'smart' | 'streamer' | 'blur' | 'crop' | 'landscape';
+  framing?: 'smart' | 'streamer' | 'blur' | 'crop' | 'landscape' | 'mlbb' | 'mlbb-vertical';
   facecamPos?: string;
   quality?: '1080p' | '720p';
   resolution?: string;
@@ -42,10 +42,11 @@ export type GameBreak = {
   source: string;
 };
 
-export type Tab = 'create' | 'history' | 'upload';
+export type Step = 'video' | 'moments' | 'clips' | 'publish';
 export type CreateMode = 'auto' | 'manual';
 export type Platform = 'youtube' | 'tiktok' | 'facebook' | 'instagram';
-export type FramingMode = 'smart' | 'streamer' | 'blur' | 'crop' | 'landscape';
+export type FramingMode = 'smart' | 'streamer' | 'blur' | 'crop' | 'landscape' | 'mlbb' | 'mlbb-vertical';
+export type VideoPresetId = 'streamer' | 'mlbb' | 'mlbb-vertical' | 'podcast';
 export type FacecamPosition = 'auto' | 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
 export type QualityMode = '1080p' | '720p';
 export type CaptionPosition = 'middle' | 'top' | 'bottom';

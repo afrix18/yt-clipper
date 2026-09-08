@@ -125,10 +125,13 @@ captionsRouter.post('/api/generate-captions-batch', async (req: Request, res: Re
       results[cid] = captionData;
     } catch (err) {
       console.warn(`Caption gen failed for clip ${cid}:`, (err as Error).message);
+      const isReg = clip.framing === 'mlbb';
       results[cid] = {
-        title: `${clip.title.slice(0, 80)} #Shorts`,
+        title: isReg ? `${clip.title.slice(0, 80)} | MLBB` : `${clip.title.slice(0, 80)} #Shorts`,
         description: clip.transcript ? `Momen seru: ${clip.title}` : 'Tonton video seru ini!',
-        hashtags: ['#Shorts', '#YouTubeShorts', '#Viral', chName ? `#${chName.replace(/\s+/g, '')}` : ''],
+        hashtags: isReg
+          ? ['#MLBB', '#MobileLegends', '#Turnamen', chName ? `#${chName.replace(/\s+/g, '')}` : '']
+          : ['#Shorts', '#YouTubeShorts', '#Viral', chName ? `#${chName.replace(/\s+/g, '')}` : ''],
       };
     }
   }

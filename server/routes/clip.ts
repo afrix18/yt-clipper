@@ -6,15 +6,32 @@ import * as aiService from '../ai';
 import type { TranscriptData, TranscriptSegment } from '../ai';
 import { loadClipsMeta, saveClipsMeta, loadConfig } from '../lib/store';
 import { runCmd, spawnProcess, generateId, formatDuration, escapeFfmpegPath } from '../lib/proc';
-import { setupSse } from '../lib/sse';
 import { CLIPS_DIR, YTDLP_PATH, FFMPEG_PATH, DETECT_FACE_SCRIPT } from '../lib/paths';
 import { resolveTargets, framingLabel, buildFilterGraph, buildFfmpegArgs } from '../lib/video';
+import { createJob, updateJob, progressReporter } from '../lib/jobs';
 import type { ClipMeta } from '../lib/types';
 
 export const clipRouter = Router();
 
-// ── POST /api/clip — Create Clip (With Real-time SSE, Framing, & Captions) ──
-clipRouter.post('/api/clip', async (req: Request, res: Response) => {
+export interface ClipTaskParams {
+  youtubeUrl: string;
+  startSec: number;
+  endSec: number;
+  framing?: string;
+  facecamPos?: string;
+  quality?: string;
+  burnCaptions?: boolean;
+  captionPos?: string;
+  customTitle?: string;
+  transcriptSegments?: TranscriptSegment[] | null;
+  provider?: string;
+  groqApiKey?: string;
+  openaiApiKey?: string;
+}
+
+// ── Worker: seluruh pipeline render berjalan di background server.
+// Panel boleh ditutup kapan pun — progres tersimpan di job store.
+export async function runClipTask(jobId: string, p: ClipTaskParams): Promise<ClipMeta> {
   const {
     youtubeUrl,
     startSec,
@@ -29,14 +46,9 @@ clipRouter.post('/api/clip', async (req: Request, res: Response) => {
     provider: reqProvider,
     groqApiKey: reqGroqKey,
     openaiApiKey: reqOpenaiKey,
-  } = req.body;
+  } = p;
 
-  if (!youtubeUrl || startSec == null || endSec == null) {
-    return res.status(400).json({ error: 'Missing required parameters' });
-  }
-
-  const { sendEvent, dispose } = setupSse(res);
-
+  const report = progressReporter(jobId);
   const clipId = generateId();
   const tmpDir = tmp.dirSync({ unsafeCleanup: true });
   const outputTemplate = path.join(tmpDir.name, 'source.%(ext)s');
@@ -45,15 +57,14 @@ clipRouter.post('/api/clip', async (req: Request, res: Response) => {
   const clipDuration = Math.max(1, endSec - startSec);
 
   const targets = resolveTargets(framing, quality);
-  const { targetW, targetH, is1080p, isLandscape } = targets;
+  const { targetW, targetH, is1080p } = targets;
 
   const ytdlpPath = YTDLP_PATH;
   const ffmpegPath = FFMPEG_PATH;
 
-  const done = (): void => { dispose(); res.end(); };
-
   try {
-    sendEvent({ type: 'progress', percent: 10, stage: 'Mempersiapkan potongan video...' });
+    updateJob(jobId, { status: 'running' });
+    report(10, 'Mempersiapkan potongan video...');
 
     // 1️⃣ Fast Section Download
     const ytArgs = [
@@ -73,11 +84,7 @@ clipRouter.post('/api/clip', async (req: Request, res: Response) => {
       if (dlMatch) {
         const dlPercent = parseFloat(dlMatch[1]);
         const overall = Math.round(10 + (dlPercent * 0.35));
-        sendEvent({
-          type: 'progress',
-          percent: Math.min(45, overall),
-          stage: `Mengunduh potongan video (${Math.round(dlPercent)}%)...`,
-        });
+        report(Math.min(45, overall), `Mengunduh potongan video (${Math.round(dlPercent)}%)...`);
         return;
       }
       const timeMatch = line.match(/time=(\d{2}):(\d{2}):(\d{2}\.?\d*)/);
@@ -85,11 +92,7 @@ clipRouter.post('/api/clip', async (req: Request, res: Response) => {
         const sec = parseInt(timeMatch[1], 10) * 3600 + parseInt(timeMatch[2], 10) * 60 + parseFloat(timeMatch[3]);
         const fraction = Math.min(1, Math.max(0, sec / clipDuration));
         const overall = Math.round(10 + (fraction * 35));
-        sendEvent({
-          type: 'progress',
-          percent: Math.min(45, overall),
-          stage: `Mengunduh potongan durasi (${Math.round(fraction * 100)}%)...`,
-        });
+        report(Math.min(45, overall), `Mengunduh potongan durasi (${Math.round(fraction * 100)}%)...`);
       }
     };
 
@@ -97,7 +100,7 @@ clipRouter.post('/api/clip', async (req: Request, res: Response) => {
       await spawnProcess(ytdlpPath, ytArgs, handleProgressLine, handleProgressLine);
     } catch (dlErr) {
       console.log(`[${clipId}] Fallback format...`, (dlErr as Error).message);
-      sendEvent({ type: 'progress', percent: 15, stage: 'Mengunduh format fallback...' });
+      report(15, 'Mengunduh format fallback...');
       const fallbackArgs = [
         '-f', 'best[ext=mp4]/best',
         '--ffmpeg-location', ffmpegPath,
@@ -109,7 +112,7 @@ clipRouter.post('/api/clip', async (req: Request, res: Response) => {
       await spawnProcess(ytdlpPath, fallbackArgs, handleProgressLine, handleProgressLine);
     }
 
-    sendEvent({ type: 'progress', percent: 50, stage: 'Potongan video siap...' });
+    report(50, 'Potongan video siap...');
 
     // Locate downloaded source
     const downloadedFiles = fs.readdirSync(tmpDir.name);
@@ -122,7 +125,7 @@ clipRouter.post('/api/clip', async (req: Request, res: Response) => {
     let clipTranscriptText = '';
 
     if (burnCaptions) {
-      sendEvent({ type: 'progress', percent: 55, stage: 'Menyiapkan caption teks TikTok style presisi...' });
+      report(55, 'Menyiapkan caption teks presisi...');
 
       const config = loadConfig();
       const provider = reqProvider || config.provider || 'groq';
@@ -137,10 +140,10 @@ clipRouter.post('/api/clip', async (req: Request, res: Response) => {
         try {
           const clipAudio = path.join(tmpDir.name, 'clip_audio.mp3');
           await runCmd(`"${ffmpegPath}" -y -i "${downloadPath}" -vn -acodec libmp3lame -q:a 4 "${clipAudio}"`);
-          sendEvent({ type: 'progress', percent: 57, stage: 'Sinkronisasi suara & kata per kata (Speech AI)...' });
+          report(57, 'Sinkronisasi suara dan kata (Speech AI)...');
           transcriptData = await aiService.transcribeAudio(clipAudio, apiKey, provider, ffmpegPath);
           clipTranscriptText = transcriptData.text || '';
-          console.log(`[${clipId}] ✅ Direct clip audio transcribed: ${transcriptData.words?.length || 0} words with millisecond precision`);
+          console.log(`[${clipId}] Direct clip audio transcribed: ${transcriptData.words?.length || 0} words`);
         } catch (tErr) {
           console.warn('[Subtitle] Direct clip transcribe failed, falling back to segments:', (tErr as Error).message);
         }
@@ -154,23 +157,22 @@ clipRouter.post('/api/clip', async (req: Request, res: Response) => {
       if (transcriptData) {
         // When using direct clip audio, startSec is 0 because the audio begins at 0.00
         const effectiveStartSec = (transcriptData.words && transcriptData.words.length > 0) ? 0 : startSec;
-        const assContent = aiService.generateAssSubtitle(transcriptData, effectiveStartSec, endSec, is1080p, captionPos);
+        const assContent = aiService.generateAssSubtitle(transcriptData, effectiveStartSec, endSec, is1080p, captionPos, framing);
         assFilePath = path.join(tmpDir.name, 'caption.ass');
         fs.writeFileSync(assFilePath, assContent, 'utf-8');
-        console.log(`[${clipId}] ✅ ASS Subtitle generated:`, assFilePath);
+        console.log(`[${clipId}] ASS Subtitle generated:`, assFilePath);
       }
     }
 
-    // 2.5️⃣ AI Face / Streamer Layout Detection
+    // 2.5️⃣ AI Face / Streamer Layout Detection (dilewati untuk mlbb/landscape: clean broadcast)
     let detectionData: any = null;
     if (framing === 'smart' || framing === 'streamer') {
-      const detectStage = framing === 'streamer'
+      report(60, framing === 'streamer'
         ? 'AI mendeteksi posisi facecam streamer...'
-        : 'AI mendeteksi posisi wajah & pembicara...';
-      sendEvent({ type: 'progress', percent: 60, stage: detectStage });
+        : 'AI mendeteksi posisi wajah dan pembicara...');
 
       try {
-        const cmd = `python "${DETECT_FACE_SCRIPT}" "${downloadPath}" "${framing}" "${req.body.facecamPos || 'auto'}"`;
+        const cmd = `python "${DETECT_FACE_SCRIPT}" "${downloadPath}" "${framing}" "${facecamPos}"`;
         const { stdout } = await runCmd(cmd);
         const lines = (stdout || '').trim().split(/[\r\n]+/);
         for (const line of lines) {
@@ -183,7 +185,7 @@ clipRouter.post('/api/clip', async (req: Request, res: Response) => {
           }
         }
         if (detectionData) {
-          console.log(`[${clipId}] 🎯 AI Detection success:`, {
+          console.log(`[${clipId}] AI Detection success:`, {
             detected: detectionData.detected,
             corner: detectionData.detectedCorner,
             smartX: detectionData.smartCrop?.cropX,
@@ -194,11 +196,8 @@ clipRouter.post('/api/clip', async (req: Request, res: Response) => {
       }
     }
 
-    sendEvent({
-      type: 'progress',
-      percent: 65,
-      stage: `Rendering video ${isLandscape ? '16:9' : '9:16'} (${framingLabel(framing)})...`,
-    });
+    const aspectLabel = framing === 'mlbb' ? '4:3' : framing === 'landscape' ? '16:9' : '9:16';
+    report(65, `Rendering video ${aspectLabel} (${framingLabel(framing)})...`);
 
     // 3️⃣ Build FFmpeg Filter Graph (satu cabang per framing — lihat lib/video.ts)
     const escapedAss = assFilePath ? escapeFfmpegPath(assFilePath) : null;
@@ -211,15 +210,11 @@ clipRouter.post('/api/clip', async (req: Request, res: Response) => {
         const timeSec = parseInt(timeMatch[1], 10) / 1000000;
         const renderFraction = Math.min(1, Math.max(0, timeSec / clipDuration));
         const overall = Math.round(65 + (renderFraction * 27));
-        sendEvent({
-          type: 'progress',
-          percent: Math.min(92, overall),
-          stage: `Rendering & Burn-in Caption (${Math.round(renderFraction * 100)}%)...`,
-        });
+        report(Math.min(92, overall), `Rendering (${Math.round(renderFraction * 100)}%)...`);
       }
     });
 
-    sendEvent({ type: 'progress', percent: 94, stage: 'Menganalisis skor viralitas...' });
+    report(94, 'Menganalisis skor viralitas...');
 
     // 4️⃣ Title & Metadata
     const stats = fs.statSync(clipPath);
@@ -270,18 +265,68 @@ clipRouter.post('/api/clip', async (req: Request, res: Response) => {
     clips.unshift(clipMeta);
     saveClipsMeta(clips);
 
-    console.log(`[${clipId}] ✅ Clip complete: ${clipFilename} (${clipMeta.fileSizeMB} MB, Captions: ${burnCaptions})`);
+    console.log(`[${clipId}] Clip complete: ${clipFilename} (${clipMeta.fileSizeMB} MB, Captions: ${burnCaptions})`);
 
     tmpDir.removeCallback();
 
-    sendEvent({ type: 'progress', percent: 100, stage: 'Clip selesai diproses!' });
-    sendEvent({ type: 'done', clip: clipMeta });
-    done();
+    updateJob(jobId, { status: 'done', percent: 100, stage: 'Clip selesai diproses!', result: { clip: clipMeta } });
+    return clipMeta;
   } catch (e) {
-    console.error(`[${clipId}] ❌ Processing error:`, e);
+    console.error(`[${clipId}] Processing error:`, e);
     tmpDir.removeCallback();
     if (fs.existsSync(clipPath)) fs.unlinkSync(clipPath);
-    sendEvent({ type: 'error', message: (e as Error).message || 'Gagal memproses clip' });
-    done();
+    updateJob(jobId, { status: 'error', error: (e as Error).message || 'Gagal memproses clip' });
+    throw e;
   }
+}
+
+// ── POST /api/clip — antrekan 1 klip, langsung balas jobId ──
+clipRouter.post('/api/clip', (req: Request, res: Response) => {
+  const { youtubeUrl, startSec, endSec } = req.body;
+  if (!youtubeUrl || startSec == null || endSec == null) {
+    return res.status(400).json({ error: 'Missing required parameters' });
+  }
+  const label = req.body.customTitle
+    ? String(req.body.customTitle).slice(0, 80)
+    : `Klip ${startSec}s-${endSec}s`;
+  const job = createJob('clip', label);
+  void runClipTask(job.id, req.body as ClipTaskParams).catch(() => { /* status sudah error */ });
+  res.json({ jobId: job.id });
+});
+
+// ── POST /api/clip-batch — antrekan N klip sekaligus, proses berurutan ──
+clipRouter.post('/api/clip-batch', (req: Request, res: Response) => {
+  const { items } = req.body as { items: ClipTaskParams[] };
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ error: 'items array wajib diisi' });
+  }
+  if (items.length > 50) {
+    return res.status(400).json({ error: 'Maksimal 50 klip per batch' });
+  }
+  for (const it of items) {
+    if (!it.youtubeUrl || it.startSec == null || it.endSec == null) {
+      return res.status(400).json({ error: 'Setiap item wajib ada youtubeUrl, startSec, endSec' });
+    }
+  }
+  const childJobs = items.map((it) =>
+    createJob('clip', it.customTitle ? String(it.customTitle).slice(0, 80) : `Klip ${it.startSec}s-${it.endSec}s`));
+  const batch = createJob('batch', `Batch ${items.length} klip`, childJobs.map((j) => j.id));
+
+  void (async () => {
+    updateJob(batch.id, { status: 'running', percent: 1, stage: `Memproses 1/${items.length}...` });
+    for (let i = 0; i < items.length; i++) {
+      try {
+        await runClipTask(childJobs[i].id, items[i]);
+      } catch { /* lanjut ke item berikutnya */ }
+      updateJob(batch.id, {
+        percent: Math.round(((i + 1) / items.length) * 100),
+        stage: i + 1 >= items.length ? 'Batch selesai!' : `Memproses ${i + 2}/${items.length}...`,
+      });
+    }
+    updateJob(batch.id, { status: 'done', percent: 100, stage: `Semua ${items.length} klip selesai!` });
+  })().catch((e) => {
+    updateJob(batch.id, { status: 'error', error: (e as Error).message || 'Batch gagal' });
+  });
+
+  res.json({ batchId: batch.id, jobIds: childJobs.map((j) => j.id) });
 });

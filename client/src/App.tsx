@@ -1,25 +1,28 @@
 import { useState, useEffect } from 'react';
 import './App.css';
-import type { Tab, ClipMeta } from './types';
+import type { Step, ClipMeta } from './types';
 import { useSettings } from './hooks/useSettings';
 import { useClips } from './hooks/useClips';
-import { useCreate } from './hooks/useCreate';
+import { useTournament } from './hooks/useTournament';
 import { useUpload } from './hooks/useUpload';
-import { SettingsModal } from './components/SettingsModal';
-import { CreatePanel } from './components/CreatePanel';
+import { useJobs } from './hooks/useJobs';
+import { StepsNav } from './components/StepsNav';
+import { JobsBanner } from './components/JobsBanner';
+import { VideoPage } from './components/VideoPage';
+import { MomentsPage } from './components/MomentsPage';
 import { HistoryPanel } from './components/HistoryPanel';
-import { UploadPanel } from './components/UploadPanel';
+import { PublishPage } from './components/PublishPage';
 
 declare const chrome: any;
 
 function App() {
-  const [tab, setTab] = useState<Tab>('create');
+  const [step, setStep] = useState<Step>('video');
 
   const settings = useSettings();
   const clipsApi = useClips();
   const { fetchClips, downloadClip } = clipsApi;
 
-  const create = useCreate({
+  const studio = useTournament({
     fetchClips,
     downloadClip,
     groqKeyInput: settings.groqKeyInput,
@@ -27,85 +30,82 @@ function App() {
     aiProvider: settings.aiProvider,
     hasGroqKey: settings.hasGroqKey,
     hasOpenaiKey: settings.hasOpenaiKey,
-    setShowSettings: settings.setShowSettings,
+    setShowSettings: () => setStep('video'),
   });
 
   const upload = useUpload({ clips: clipsApi.clips, downloadClip });
+  const jobsApi = useJobs();
 
   useEffect(() => {
     settings.fetchSettings();
+    fetchClips();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchClips]);
-
-  const handleToggleMomentSelect = (index: number) => {
-    const updated = [...create.detectedMoments];
-    if (!updated[index]) return;
-    updated[index] = { ...updated[index], selected: !updated[index].selected };
-    create.setDetectedMoments(updated);
-  };
+  }, []);
 
   const handleUploadClip = (clip: ClipMeta) => {
     upload.setSelectedClipId(clip.id);
-    setTab('upload');
+    setStep('publish');
+  };
+
+  const openLibrary = () => {
+    try {
+      if (typeof chrome !== 'undefined' && chrome.runtime?.getURL && chrome.tabs?.create) {
+        chrome.tabs.create({ url: chrome.runtime.getURL('dist/library.html') });
+        return;
+      }
+    } catch { /* fallback di bawah */ }
+    window.open('dist/library.html', '_blank');
   };
 
   return (
     <div className="app-container">
-      {/* Header */}
       <header className="app-header">
-        <div className="app-logo">✂️</div>
+        <div className="app-logo-text">C</div>
         <div className="app-header-text">
-          <h1>YT Short Clipper</h1>
-          <p>Auto viral clip & dynamic captions</p>
+          <h1>Clipper</h1>
+          <p>Potong video panjang jadi klip siap tayang</p>
         </div>
-        <button
-          className="settings-icon-btn"
-          onClick={() => { settings.setShowSettings(!settings.showSettings); settings.setSettingsMsg(''); }}
-          title="Pengaturan API Key AI"
-        >
-          ⚙️
-        </button>
       </header>
 
-      {/* Settings Modal */}
-      <SettingsModal settings={settings} />
+      <JobsBanner
+        jobsApi={jobsApi}
+        onGoMoments={() => setStep('moments')}
+        onGoClips={() => setStep('clips')}
+      />
 
-      {/* Tab Navigation */}
-      <nav className="tab-nav">
-        {([['create', '✂️', 'Buat'], ['history', '📋', 'Histori'], ['upload', '🚀', 'Upload']] as const).map(([key, icon, label]) => (
-          <button
-            key={key}
-            className={`tab-btn ${tab === key ? 'active' : ''}`}
-            onClick={() => { setTab(key as Tab); if (key === 'history') fetchClips(); }}
-          >
-            <span className="tab-icon">{icon}</span>
-            {label}
-            {key === 'history' && clipsApi.clips.length > 0 && <span className="tab-badge">{clipsApi.clips.length}</span>}
+      <StepsNav
+        step={step}
+        onGo={(s) => { setStep(s); if (s === 'clips') fetchClips(); }}
+        momentsCount={studio.detectedMoments.length}
+        clipsCount={clipsApi.clips.length}
+      />
+
+      {step === 'video' && (
+        <VideoPage studio={studio} settings={settings} onAnalyzed={() => setStep('moments')} />
+      )}
+
+      {step === 'moments' && (
+        <MomentsPage studio={studio} onRendered={() => { setStep('clips'); }} onGoVideo={() => setStep('video')} />
+      )}
+
+      {step === 'clips' && (
+        <>
+          <button type="button" className="ghost-btn" style={{ width: '100%' }} onClick={openLibrary}>
+            Buka Tampilan Lebar (tab baru)
           </button>
-        ))}
-      </nav>
-
-      {/* ═══ CREATE TAB ═══ */}
-      {tab === 'create' && (
-        <CreatePanel create={create} onToggleMomentSelect={handleToggleMomentSelect} />
+          <HistoryPanel clips={clipsApi} onUploadClip={handleUploadClip} onGoVideo={() => setStep('video')} />
+        </>
       )}
 
-      {/* ═══ HISTORY TAB ═══ */}
-      {tab === 'history' && (
-        <HistoryPanel clips={clipsApi} onUploadClip={handleUploadClip} onGoCreate={() => setTab('create')} />
+      {step === 'publish' && (
+        <PublishPage upload={upload} clips={clipsApi.clips} onGoClips={() => setStep('clips')} />
       )}
 
-      {/* ═══ UPLOAD TAB ═══ */}
-      {tab === 'upload' && (
-        <UploadPanel upload={upload} clips={clipsApi.clips} onGoCreate={() => setTab('create')} />
-      )}
-
-      {/* Footer */}
       <footer className="app-footer">
-        <p>YT Short Clipper v2.5 AI</p>
+        <p>Clipper v3.0</p>
         <div className="footer-badge">
           <span className="dot" />
-          Server terhubung · Port 3002
+          Server lokal port 3002
         </div>
       </footer>
     </div>

@@ -2,7 +2,7 @@
 // Satu cabang per mode (tidak bersarang) — tiap mode menghasilkan
 // label stream video yang di-map ke output.
 
-export type Framing = 'smart' | 'streamer' | 'blur' | 'crop' | 'landscape';
+export type Framing = 'smart' | 'streamer' | 'blur' | 'crop' | 'landscape' | 'mlbb' | 'mlbb-vertical';
 
 interface StreamerBox {
   w: number;
@@ -59,17 +59,28 @@ export interface RenderTargets {
 export function resolveTargets(framing: string, quality: string): RenderTargets {
   const is1080p = quality === '1080p';
   const isLandscape = framing === 'landscape';
+  const isMlbb = framing === 'mlbb';
   return {
     is1080p,
     isLandscape,
-    targetW: isLandscape ? (is1080p ? 1920 : 1280) : (is1080p ? 1080 : 720),
-    targetH: isLandscape ? (is1080p ? 1080 : 720) : (is1080p ? 1920 : 1280),
+    targetW: isMlbb
+      ? (is1080p ? 1440 : 960)
+      : isLandscape
+        ? (is1080p ? 1920 : 1280)
+        : (is1080p ? 1080 : 720),
+    targetH: isMlbb
+      ? (is1080p ? 1080 : 720)
+      : isLandscape
+        ? (is1080p ? 1080 : 720)
+        : (is1080p ? 1920 : 1280),
   };
 }
 
 export function framingLabel(framing: string): string {
   switch (framing) {
     case 'streamer': return 'Mode Streamer';
+    case 'mlbb': return 'MLBB Turnamen (4:3)';
+    case 'mlbb-vertical': return 'MLBB Vertikal (HP)';
     case 'smart': return 'Smart Auto-Crop';
     case 'landscape': return 'Landscape (Video Reguler)';
     case 'blur': return 'Blur BG';
@@ -91,6 +102,17 @@ export function buildFilterGraph(
     const topH = is1080p ? 780 : 520;
     const botH = is1080p ? 1140 : 760;
     base = streamerGraph(targetW, topH, botH, detection);
+  } else if (framing === 'mlbb') {
+    // MLBB turnamen 4:3 — crop tengah dari source 16:9 (buang kiri-kanan,
+    // HUD tengah/minimap tetap utuh), tanpa facecam.
+    base = `[0:v]crop=in_h*4/3:in_h:(in_w-in_h*4/3)/2:0,scale=${targetW}:${targetH},setsar=1[v]`;
+  } else if (framing === 'mlbb-vertical') {
+    // MLBB vertikal untuk HP/Reels/Shorts: konten 3:4 di tengah kanvas 9:16
+    // dengan blur-fill atas-bawah (layar penuh, HUD 3:4 utuh).
+    const fgH = is1080p ? 1440 : 960;
+    base = `[0:v]scale=${targetW}:${targetH}:force_original_aspect_ratio=increase,crop=${targetW}:${targetH},boxblur=25:5[bg];`
+      + `[0:v]crop=in_h*3/4:in_h:(in_w-in_h*3/4)/2:0,scale=${targetW}:${fgH},setsar=1[fg];`
+      + `[bg][fg]overlay=(W-w)/2:(H-h)/2[v]`;
   } else if (framing === 'landscape') {
     // Landscape pass-through 16:9 (potongan game / video reguler):
     // scale-down saja + pad pengaman dimensi ganjil, tanpa crop.

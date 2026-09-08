@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { API, PLATFORMS, PENDING_KEY, STUDIO_UPLOAD_URL } from '../lib/api';
+import { toLocalInputValue } from '../lib/format';
 import type { ClipMeta, Platform, BatchCaption } from '../types';
 
 declare const chrome: any;
@@ -26,7 +27,7 @@ export function useUpload({ clips, downloadClip }: UploadDeps) {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     tomorrow.setHours(18, 0, 0, 0);
-    return tomorrow.toISOString().slice(0, 16);
+    return toLocalInputValue(tomorrow);
   });
   const [uploadStatusMsg, setUploadStatusMsg] = useState('');
   const [autoPublishMode, setAutoPublishMode] = useState<boolean>(true);
@@ -42,17 +43,42 @@ export function useUpload({ clips, downloadClip }: UploadDeps) {
   const [batchStartTime, setBatchStartTime] = useState(() => {
     const nextHour = new Date();
     nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
-    return nextHour.toISOString().slice(0, 16);
+    return toLocalInputValue(nextHour);
   });
   const [customClipSchedules, setCustomClipSchedules] = useState<Record<string, string>>({});
   const [batchCaptions, setBatchCaptions] = useState<Record<string, BatchCaption>>({});
   const [generatingBatchCaptions, setGeneratingBatchCaptions] = useState(false);
 
-  // Prefill antrean batch saat histori pertama kali termuat
+  // Prefill antrean batch: prioritas pilihan dari halaman Library,
+  // lalu semua klip bila belum ada pilihan.
   useEffect(() => {
-    if (clips.length > 0) {
-      setSelectedBatchClipIds(prev => (prev.length === 0 ? clips.map(c => c.id) : prev));
+    if (clips.length === 0) return;
+    try {
+      const raw = localStorage.getItem('yt_clipper_library_selection');
+      if (raw) {
+        const ids = (JSON.parse(raw) as string[]).filter(id => clips.some(c => c.id === id));
+        localStorage.removeItem('yt_clipper_library_selection');
+        if (ids.length > 0) {
+          setSelectedBatchClipIds(ids);
+          setUploadSubMode('batch');
+          return;
+        }
+      }
+    } catch { /* abaikan */ }
+    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+      chrome.storage.local.get(['yt_clipper_library_selection'], (res: any) => {
+        const ids = (res?.yt_clipper_library_selection || []).filter((id: string) => clips.some(c => c.id === id));
+        chrome.storage.local.remove(['yt_clipper_library_selection']);
+        if (ids.length > 0) {
+          setSelectedBatchClipIds(ids);
+          setUploadSubMode('batch');
+        } else {
+          setSelectedBatchClipIds(prev => (prev.length === 0 ? clips.map(c => c.id) : prev));
+        }
+      });
+      return;
     }
+    setSelectedBatchClipIds(prev => (prev.length === 0 ? clips.map(c => c.id) : prev));
   }, [clips]);
 
   const togglePlatform = (key: Platform) => {
@@ -60,6 +86,9 @@ export function useUpload({ clips, downloadClip }: UploadDeps) {
   };
 
   const selectedClip = clips.find(c => c.id === selectedClipId) || null;
+  // Platform caption mengikuti framing: mlbb 4:3 = video turnamen reguler
+  // (tanpa #Shorts), sisanya Shorts.
+  const captionPlatform = selectedClip?.framing === 'mlbb' ? 'tournament' : 'youtube';
 
   useEffect(() => {
     if (selectedClip) {
@@ -69,9 +98,10 @@ export function useUpload({ clips, downloadClip }: UploadDeps) {
       }
       const activeCh = channelName || clipChannel;
       const chTag = activeCh ? ` #${activeCh.trim().replace(/\s+/g, '')}` : '';
-      setUploadTitle(selectedClip.title ? `${selectedClip.title.slice(0, 80)} #Shorts` : '');
+      const isReg = selectedClip.framing === 'mlbb';
+      setUploadTitle(selectedClip.title ? (isReg ? `${selectedClip.title.slice(0, 80)} | MLBB` : `${selectedClip.title.slice(0, 80)} #Shorts`) : '');
       setUploadDesc(selectedClip.transcript ? `Momen seru: ${selectedClip.title}\n\nJangan lupa like, komen, dan subscribe untuk video seru lainnya!` : 'Tonton video seru ini!');
-      setUploadTags(`#Shorts #YouTubeShorts${chTag} #Viral #FYP #Trending`);
+      setUploadTags(isReg ? `#MLBB #MobileLegends${chTag} #Turnamen #Viral` : `#Shorts #YouTubeShorts${chTag} #Viral #FYP #Trending`);
       setUploadStatusMsg('');
     }
   }, [selectedClipId]);
@@ -87,7 +117,7 @@ export function useUpload({ clips, downloadClip }: UploadDeps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           clipId: selectedClip.id,
-          platform: 'youtube',
+          platform: captionPlatform,
           channelName: activeCh,
         }),
       });
@@ -101,10 +131,10 @@ export function useUpload({ clips, downloadClip }: UploadDeps) {
           setChannelName(data.channelName);
           localStorage.setItem('yt_clipper_channel', data.channelName);
         }
-        setUploadStatusMsg('✨ Judul viral, deskripsi kontekstual & hashtag channel berhasil dibuat AI!');
+        setUploadStatusMsg('Judul viral, deskripsi dan tagar berhasil dibuat AI.');
       }
     } catch (e: any) {
-      setUploadStatusMsg(`❌ ${e.message}`);
+      setUploadStatusMsg(`Gagal: ${e.message}`);
     } finally {
       setGeneratingCaption(false);
     }
@@ -162,15 +192,15 @@ export function useUpload({ clips, downloadClip }: UploadDeps) {
 
     setUploadStatusMsg(
       autoPublishMode
-        ? '🚀 YouTube Studio dibuka! Ekstensi otomatis menginjeksi file video, mengisi Judul & Deskripsi, serta menekan "Berikutnya" hingga video selesai dipublikasikan.'
-        : '🚀 YouTube Studio dibuka! Ekstensi otomatis menginjeksi video & mengisi form, lalu menunggu Anda memeriksa sebelum klik Publikasikan.'
+        ? 'YouTube Studio dibuka. Ekstensi otomatis mengisi video, judul dan deskripsi sampai terbit.'
+        : 'YouTube Studio dibuka. Ekstensi mengisi form otomatis, lalu menunggu pemeriksaan sebelum terbit.'
     );
   };
 
   const handleCopyAllCaption = () => {
     const full = `${uploadTitle}\n\n${uploadDesc}\n\n${uploadTags}`.trim();
     navigator.clipboard.writeText(full);
-    setUploadStatusMsg('📋 Judul, deskripsi, dan hashtag disalin ke clipboard!');
+    setUploadStatusMsg('Judul, deskripsi, dan tagar disalin ke clipboard.');
   };
 
   // ── Batch Scheduling Helper Methods
@@ -189,7 +219,8 @@ export function useUpload({ clips, downloadClip }: UploadDeps) {
       const offsetMs = indexInSelected * batchIntervalHours * 60 * 60 * 1000;
       target = new Date(base.getTime() + offsetMs);
     }
-    return target.toISOString().slice(0, 16);
+    // Waktu lokal mentah — JANGAN toISOString (menggeser ke UTC).
+    return toLocalInputValue(target);
   };
 
   const toggleSelectBatchClip = (id: string) => {
@@ -225,10 +256,10 @@ export function useUpload({ clips, downloadClip }: UploadDeps) {
       if (!res.ok) throw new Error(data.error || 'Gagal membuat caption AI batch');
       if (data.results) {
         setBatchCaptions(prev => ({ ...prev, ...data.results }));
-        setUploadStatusMsg(`✨ Berhasil membuat judul viral & caption AI untuk ${Object.keys(data.results).length} video antrean!`);
+        setUploadStatusMsg(`Caption AI selesai untuk ${Object.keys(data.results).length} video antrean.`);
       }
     } catch (e: any) {
-      setUploadStatusMsg(`❌ ${e.message}`);
+      setUploadStatusMsg(`Gagal: ${e.message}`);
     } finally {
       setGeneratingBatchCaptions(false);
     }
@@ -236,7 +267,7 @@ export function useUpload({ clips, downloadClip }: UploadDeps) {
 
   const handleStartBatchUpload = async () => {
     if (selectedBatchClipIds.length === 0) {
-      setUploadStatusMsg('⚠️ Pilih minimal 1 video untuk antrean jadwal.');
+      setUploadStatusMsg('Pilih minimal 1 video untuk antrean jadwal.');
       return;
     }
     if (batchUploading) return; // anti klik-ganda: antrean sedang dikirim
@@ -299,7 +330,7 @@ export function useUpload({ clips, downloadClip }: UploadDeps) {
     }, 500);
 
     setUploadStatusMsg(
-      `🚀 Antrean ${items.length} video berhasil dibuat! Tab YouTube Studio dibuka dan ekstensi akan mengupload serta menjadwalkan setiap video satu per satu secara otomatis.`
+      `Antrean ${items.length} video dibuat. Tab YouTube Studio dibuka dan ekstensi menjadwalkan tiap video otomatis.`
     );
     } finally {
       setBatchUploading(false);

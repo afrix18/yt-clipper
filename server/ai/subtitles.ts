@@ -10,16 +10,26 @@ export function formatAssTime(seconds: number): string {
 }
 
 // ── Generate ASS Subtitle with TikTok / Shorts Style (Word-Level Timing) ──
-export function generateAssSubtitle(transcriptInput: unknown, startSec = 0, endSec = 0, is1080p = true, captionPos = 'middle'): string {
-  const playResX = is1080p ? 1080 : 720;
-  const playResY = is1080p ? 1920 : 1280;
-  const fontSize = is1080p ? 70 : 46;
+export function generateAssSubtitle(transcriptInput: unknown, startSec = 0, endSec = 0, is1080p = true, captionPos = 'middle', framing: string = 'vertical'): string {
+  const isMlbb = framing === 'mlbb';
+  const playResX = isMlbb ? (is1080p ? 1440 : 960) : (is1080p ? 1080 : 720);
+  const playResY = isMlbb ? (is1080p ? 1080 : 720) : (is1080p ? 1920 : 1280);
+  const fontSize = isMlbb ? (is1080p ? 56 : 38) : (is1080p ? 70 : 46);
   const outlineWidth = is1080p ? 6 : 4;
 
   // Vertical margin from bottom edge (Alignment 2 = bottom-center)
-  // Raised significantly so it does not cover the person/streamer or get covered by Shorts/TikTok UI
+  // Raised significantly so it does not cover the person/streamer or get covered by Shorts/TikTok UI.
+  // Kanvas 4:3 (MLBB) lebih pendek — margin disesuaikan agar teks di zona bawah aman.
   let marginV: number;
-  if (captionPos === 'top') {
+  if (isMlbb) {
+    if (captionPos === 'top') {
+      marginV = is1080p ? 760 : 505;
+    } else if (captionPos === 'middle') {
+      marginV = is1080p ? 540 : 360;
+    } else {
+      marginV = is1080p ? 220 : 150;
+    }
+  } else if (captionPos === 'top') {
     marginV = is1080p ? 1320 : 880; // Upper third
   } else if (captionPos === 'bottom') {
     marginV = is1080p ? 560 : 375; // Lower zone, safely above UI buttons
